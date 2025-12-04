@@ -1,0 +1,189 @@
+import { Button, VerticalBox, LineEdit, ProgressIndicator, } from "std-widgets.slint";
+
+export enum PageMode {
+    Log,
+    Cmd,
+    Home,
+}
+
+// 主窗口：启动后会被代码设置成 fullscreen
+export component MainWindowUi inherits Window {
+    title: "PigXiaoEr";
+    icon: @image-url("../icons/colorIcon.ico");
+    background: black;
+
+    in-out property <PageMode> current-mode: PageMode.Home;
+    in-out property <string> home-text: "Hello, Slint!";
+    in-out property <string> log-text: "log";
+    in-out property <string> cmd-output: "CMD";
+
+    // 用来控制右键菜单的可见和位置
+    in-out property <bool> menu-visible: false;
+    private property <length> menu-x: 0;
+    private property <length> menu-y: 0;
+
+    ContextMenuArea {
+        width: 100%;
+        height: 100%;
+
+        menu := Menu {
+            MenuItem {
+                title: "显示窗口";
+                activated => { root.show-window(); }
+            }
+            MenuItem {
+                title: "隐藏窗口";
+                activated => { root.hide-window(); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: "设置";
+                activated => { root.settings-clicked(); }
+            }
+            MenuItem {
+                title: "暂停";
+                activated => { root.pause-clicked(); }
+            }
+            MenuItem {
+                title: "退出";
+                activated => { root.exit(); }
+            }
+        }
+
+    // 主体垂直布局
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 20px;
+        padding: 20px;
+
+        // 主页文字
+        if root.current-mode == PageMode.Home : Text {
+            height: parent.height * 0.8;
+            text: root.home-text;
+            color: red;
+            font-size: root.width * 0.1;
+            horizontal-stretch: 1.0;
+            vertical-stretch: 0.0;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        // Show GaiaNet Logs
+        if root.current-mode == PageMode.Log : Text {
+            height: parent.height * 0.8;
+            text: root.log-text;
+            color: white;
+            font-size: 10px;
+            horizontal-stretch: 1.0;
+            vertical-stretch: 0.0;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        // Show GaiaNet Logs
+        if root.current-mode == PageMode.Cmd : VerticalLayout {
+            height: parent.height * 0.8;
+            spacing: 8px;
+
+            Rectangle {
+                horizontal-stretch: 1.0;
+                vertical-stretch: 1.0;
+                border-width: 1px;
+                border-color: #444;
+                background: #000;
+
+                Text {
+                    text: root.cmd-output;
+                    color: #0f0;
+                    wrap: word-wrap;
+                    horizontal-alignment: left;
+                    vertical-alignment: top;
+                    padding: 10px;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                cmd_input := LineEdit {
+                    horizontal-stretch: 1.0;
+                    placeholder-text: "输入命令...";
+
+                    // 按回车发送
+                    accepted(text) => {
+                        root.command-submitted(text);
+                        self.text = "";
+                    }
+                }
+
+                Button {
+                    text: "发送";
+                    clicked => {
+                        root.command-submitted(cmd_input.text);
+                        cmd_input.text = "";
+                    }
+                }
+            }
+        }
+
+        // 底部按钮区域
+        HorizontalLayout {
+            spacing: 1px;
+            Button { text: "Home";
+                clicked => { root.current-mode = PageMode.Home;}
+            }
+            Button { text: "GaiaNet-Log";
+                clicked => { root.current-mode = PageMode.Log;
+                    root.logmode-init(); }
+            }
+
+            Button { text: "GaiaNet-Cmd";
+                clicked => { root.current-mode = PageMode.Cmd;
+                    root.cmdmode-init(); }
+            }
+
+            Button { text: "Exit";
+                clicked => { root.exit(); }
+            }
+        }
+    }
+    }
+
+    callback open-second();
+    callback quit-app();
+    callback settings-clicked();
+    callback pause-clicked();
+
+    callback show-menu();
+    callback show-window();
+    callback hide-window();
+    callback exit();
+
+    callback logmode-init();
+    callback cmdmode-init();
+    callback command-submitted(command: string);
+
+    show-menu => {root.menu-x = root.width / 2 - 100px;
+            root.menu-y = root.height / 2 - 75px;
+            root.menu-visible = true;
+    }
+}
+
+// 二级窗口：普通大小，可拖动/最小化
+export component SecondWindow inherits Window {
+    title: "二级窗口";
+    preferred-width: 800px;
+    preferred-height: 600px;
+
+    VerticalBox {
+        Text {
+            text: "我是第二个窗口";
+        }
+
+        Button {
+            text: "关闭";
+            clicked => {
+                root.visible = false;
+            }
+        }
+    }
+}
