@@ -21,6 +21,7 @@ dependencies = [
  "GaiaNet",
  "i-slint-backend-android-activity",
  "i-slint-backend-winit",
+ "log",
  "slint",
  "slint-build",
  "tray-icon",

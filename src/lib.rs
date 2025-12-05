@@ -1,42 +1,28 @@
-// mod infobox;
-mod mainwindow;
-// mod setting;
-// mod slogan;
+// Android 平台入口点（cdylib）
 
-#[cfg(not(target_os = "android"))]
-mod systemtray;
+mod log_capture;
+mod mainwindow;
 
 slint::include_modules!();
 
-#[cfg(target_os = "android")]
-use slint::android::{AndroidApp, *};
-
-#[cfg(not(target_os = "android"))]
-#[no_mangle]
-pub extern "C" fn wokankan() {}
-
-#[cfg(not(target_os = "android"))]
-#[no_mangle]
-pub extern "C" fn niseesee(a: i32) -> f32 {
-    a as f32
-}
-
-#[cfg(not(target_os = "android"))]
-#[no_mangle]
-pub extern "C" fn woshimain(a: std::os::raw::c_schar) -> Result<(), slint::PlatformError> {
-    let main_win = mainwindow::MainWindow::new()?;
-    main_win.window().set_fullscreen(true);
-    main_win.run()?;
-    // let tray = systemtray::SystemTray::new();
-    //
-    // tray.show();
-    Ok(())
-}
+use GaiaNet::gaia_nets::daemon_server::DaemonServer;
 
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: slint::android::AndroidApp) {
+    // 1. 创建共享的日志缓冲区
+    let log_buffer = mainwindow::new_log_buffer();
+
+    // 2. 初始化日志捕获系统
+    let _ = mainwindow::init_log_capture(log_buffer.clone(), 200);
+
+    // 3. 启动 DaemonServer
+    let mut daemon_server = DaemonServer::new();
+    daemon_server.run("shell", "net.conf");
+
     slint::android::init(app).unwrap();
-    let main_win = mainwindow::MainWindow::new().unwrap();
+
+    // 4. 创建带日志缓冲区的主窗口
+    let main_win = mainwindow::MainWindow::new_with_log_buffer(log_buffer).unwrap();
     main_win.run().unwrap();
 }

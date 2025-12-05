@@ -3,9 +3,11 @@ name = "PigXiaoEr"
 version = "0.1.0"
 edition = "2021"
 
+
 [lib]
 name = "PigXiaoEr_lib"
 crate-type = ["cdylib"]
+path = "src/lib.rs"
 
 [profile.release]
 opt-level = "z"  # 最小化体积的优化
@@ -17,18 +19,21 @@ strip = true      # 移除调试符号
 [build-dependencies]
 slint-build = "*"
 
+# ========= 通用依赖（所有平台） =========
+[dependencies]
+GaiaNet = { path = "../GaiaNet" }
+log = "0.4"
+
 # ========= 桌面平台（Windows/macOS/Linux） =========
 [target.'cfg(not(target_os = "android"))'.dependencies]
 slint = { version = "1.13", features = ["backend-winit", "renderer-femtovg", "compat-1-2"] }
 i-slint-backend-winit = { version = "1.13", features = ["renderer-femtovg"] }
-tray-icon = { version = "*" }
-GaiaNet = {path = "../GaiaNet"}
+tray-icon = "*"
 
 # ========= Android 平台 =========
 [target.'cfg(target_os = "android")'.dependencies]
 slint = { version = "1.13", default-features = false, features = ["std", "backend-android-activity-06", "renderer-skia-opengl","compat-1-2"] }
 i-slint-backend-android-activity = { version = "1.13", features = ["native-activity"] }
-GaiaNet = {path = "../GaiaNet"}
 
 [package.metadata.android.signing.release]
 path = "C:/Users/bzwang/android-release.keystore"

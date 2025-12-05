@@ -1,4 +1,5 @@
 // use crate::setting;
+use crate::log_capture::{self, LogBuffer};
 #[cfg(not(target_os = "android"))]
 use crate::systemtray;
 use slint::{ComponentHandle, SharedString, Timer};
@@ -10,21 +11,43 @@ pub struct MainWindow {
     pic_list: Vec<slint::Image>,
     pic_index: usize,
     timer: Timer,
+    log_timer: Timer,        // 用于定期更新日志显示
+    log_buffer: LogBuffer,   // 共享的日志缓冲区
     // systemtray: systemtray::SystemTray,
 }
 
 impl MainWindow {
-    pub fn new() -> Result<MainWindowUi, slint::PlatformError> {
+    /// 创建 MainWindow，需要传入日志缓冲区
+    pub fn new_with_log_buffer(log_buffer: LogBuffer) -> Result<MainWindowUi, slint::PlatformError> {
         let ui = MainWindowUi::new()?;
         let timer = Timer::default();
+        let log_timer = Timer::default();
 
         // 将所有状态和逻辑封装在 Rc<RefCell<...>> 中
         let state = Rc::new(RefCell::new(Self {
             pic_list: vec![], // 在这里加载或初始化图片列表
             pic_index: 0,
             timer, // 将 timer 的所有权移入 state
+            log_timer,
+            log_buffer: log_buffer.clone(),
             // systemtray: systemtray::SystemTray::new(),
         }));
+
+        // 启动日志更新定时器（每 500ms 更新一次 UI）
+        {
+            let ui_handle = ui.as_weak();
+            let log_buffer = log_buffer.clone();
+            state.borrow().log_timer.start(
+                slint::TimerMode::Repeated,
+                std::time::Duration::from_millis(500),
+                move || {
+                    if let Some(ui) = ui_handle.upgrade() {
+                        let logs = log_capture::get_logs(&log_buffer);
+                        ui.set_log_text(logs.into());
+                    }
+                },
+            );
+        }
 
         // 连接 UI 回调到我们的状态逻辑
         // 使用 .clone() 来为每个回调创建一个新的 Rc 引用
@@ -100,6 +123,39 @@ impl MainWindow {
             }
         });
 
+        // 日志模式初始化回调
+        ui.on_logmode_init({
+            let ui_handle = ui.as_weak();
+            let log_buffer = log_buffer.clone();
+            move || {
+                if let Some(ui) = ui_handle.upgrade() {
+                    // 立即更新日志显示
+                    let logs = log_capture::get_logs(&log_buffer);
+                    ui.set_log_text(logs.into());
+                    log::info!("切换到日志模式");
+                }
+            }
+        });
+
+        // CMD 模式初始化回调
+        ui.on_cmdmode_init({
+            move || {
+                log::info!("切换到 CMD 模式");
+            }
+        });
+
+        // 命令提交回调
+        ui.on_command_submitted({
+            let ui_handle = ui.as_weak();
+            move |cmd: SharedString| {
+                log::info!("执行命令: {}", cmd);
+                if let Some(ui) = ui_handle.upgrade() {
+                    let output = format!("$ {}\n执行中...\n", cmd);
+                    ui.set_cmd_output(output.into());
+                }
+            }
+        });
+
 
         // 启动计时器
         state.borrow().timer.start(
@@ -141,4 +197,15 @@ impl MainWindow {
         ui.set_home_text("暂停/恢复".into());
         println!("切换暂停状态");
     }
+
+    /// 向后兼容的 new 方法（创建新的日志缓冲区）
+    pub fn new() -> Result<MainWindowUi, slint::PlatformError> {
+        let buffer = log_capture::new_log_buffer();
+        // 初始化日志捕获（如果尚未初始化）
+        let _ = log_capture::init_log_capture(buffer.clone(), 100);
+        Self::new_with_log_buffer(buffer)
+    }
 }
+
+/// 导出日志缓冲区类型和相关函数，供 main.rs 使用
+pub use crate::log_capture::{new_log_buffer, init_log_capture, append_log, get_logs, clear_logs};
